@@ -40,3 +40,22 @@ func TestNotInBuild(t *testing.T) {
 		}
 	}
 }
+
+// Make sure SearchObjects finds implicitly defined
+// objects as well
+func TestImplicitObjects(t *testing.T) {
+	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
+
+	typ := foo.ResolveType("github.com/retailnext/stan/internal/foo.ImplicitOnlyType")
+	objs := foo.SearchObjects(func(o types.Object) bool {
+		if _, ok := o.(*types.TypeName); ok {
+			return false
+		}
+		return types.Identical(o.Type(), typ)
+	})
+
+	// one obj for implicit case def, one for use within case
+	if l := len(objs); l != 2 {
+		t.Errorf("found %d objs", l)
+	}
+}

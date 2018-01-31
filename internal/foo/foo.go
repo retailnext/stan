@@ -12,3 +12,13 @@ func FooFunc() {
 }
 
 var myIntArray [10]int
+
+type ImplicitOnlyType int
+
+func foo() {
+	var i interface{}
+	switch v := i.(type) {
+	case ImplicitOnlyType:
+		_ = v
+	}
+}

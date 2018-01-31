@@ -58,6 +58,11 @@ func (p *Package) SearchObjects(f func(types.Object) bool) []types.Object {
 			ret = append(ret, obj)
 		}
 	}
+	for _, obj := range p.TypesInfo.Implicits {
+		if f == nil || f(obj) {
+			ret = append(ret, obj)
+		}
+	}
 	return ret
 }
 
@@ -171,9 +176,10 @@ func typeCheck(pkg *parsedPackage) *Package {
 		FakeImportC: true,
 	}
 	info := types.Info{
-		Types: make(map[ast.Expr]types.TypeAndValue),
-		Defs:  make(map[*ast.Ident]types.Object),
-		Uses:  make(map[*ast.Ident]types.Object),
+		Types:     make(map[ast.Expr]types.TypeAndValue),
+		Defs:      make(map[*ast.Ident]types.Object),
+		Uses:      make(map[*ast.Ident]types.Object),
+		Implicits: make(map[ast.Node]types.Object),
 	}
 
 	dedupeObjects(pkg.buildFiles, pkg.nonBuildFiles)
