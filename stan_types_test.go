@@ -10,15 +10,15 @@ import (
 	"testing"
 )
 
-func TestResolve(t *testing.T) {
+func TestLookup(t *testing.T) {
 	for _, pkg := range Pkgs("github.com/retailnext/stan/internal/...") {
 		if strings.HasSuffix(pkg.Path(), ":xtest") {
 			continue
 		}
 
-		// show that resolved type works for both a package that imports the type
+		// show that lookupd type works for both a package that imports the type
 		// and the package that defines it
-		barType := pkg.ResolveType("github.com/retailnext/stan/internal/bar.BarType")
+		barType := pkg.LookupType("github.com/retailnext/stan/internal/bar.BarType")
 		objs := pkg.SearchObjects(func(o types.Object) bool {
 			return types.Identical(o.Type(), barType)
 		})
@@ -27,17 +27,17 @@ func TestResolve(t *testing.T) {
 		}
 
 		// similar, but for object
-		barObj := pkg.ResolveObject("github.com/retailnext/stan/internal/bar.BarVar")
+		barObj := pkg.LookupObject("github.com/retailnext/stan/internal/bar.BarVar")
 		if len(pkg.SpanOf(barObj).Uses) == 0 {
 			t.Errorf("%s has no uses of object %s", pkg.Path(), barObj)
 		}
 	}
 }
 
-func TestResolveBuiltinType(t *testing.T) {
+func TestLookupBuiltinType(t *testing.T) {
 	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
-	obj := foo.ResolveObject("github.com/retailnext/stan/internal/foo.myIntArray")
-	if !types.Identical(obj.Type(), foo.ResolveType("[10]int")) {
+	obj := foo.LookupObject("github.com/retailnext/stan/internal/foo.myIntArray")
+	if !types.Identical(obj.Type(), foo.LookupType("[10]int")) {
 		t.Error("types didn't match")
 	}
 }
@@ -58,8 +58,8 @@ func TestXTestPackage(t *testing.T) {
 	}
 
 	// they both have FooFunc()
-	foo[0].ResolveObject("github.com/retailnext/stan/internal/foo.FooFunc")
-	foo[1].ResolveObject("github.com/retailnext/stan/internal/foo:xtest.FooFunc")
+	foo[0].LookupObject("github.com/retailnext/stan/internal/foo.FooFunc")
+	foo[1].LookupObject("github.com/retailnext/stan/internal/foo:xtest.FooFunc")
 
 	// if you ask for package directly, you get code package
 	singleFoo := Pkgs("github.com/retailnext/stan/internal/foo")

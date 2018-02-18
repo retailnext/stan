@@ -46,7 +46,7 @@ func TestNotInBuild(t *testing.T) {
 func TestImplicitObjects(t *testing.T) {
 	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
 
-	typ := foo.ResolveType("github.com/retailnext/stan/internal/foo.ImplicitOnlyType")
+	typ := foo.LookupType("github.com/retailnext/stan/internal/foo.ImplicitOnlyType")
 	objs := foo.SearchObjects(func(o types.Object) bool {
 		if _, ok := o.(*types.TypeName); ok {
 			return false

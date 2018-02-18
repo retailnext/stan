@@ -12,17 +12,17 @@ import (
 
 // Look up a types.Type based on the name of a type, or an unnamed type expression.
 //
-//   ResolveType("encoding/json.Marshaler") // named types are <import path>.<name>
-//   ResolveType("*encoding/json.Encoder")  // prepend "*" to get pointer type
-//   ResolveType("[5]int")                  // for builtin types, use arbitary expression
+//   LookupType("encoding/json.Marshaler") // named types are <import path>.<name>
+//   LookupType("*encoding/json.Encoder")  // prepend "*" to get pointer type
+//   LookupType("[5]int")                  // for builtin types, use arbitary expression
 //
-// If an error occurs or the type cannot be found, ResolveType() panics.
-func (p *Package) ResolveType(typeSpec string) types.Type {
+// If an error occurs or the type cannot be found, LookupType() panics.
+func (p *Package) LookupType(typeSpec string) types.Type {
 	if cached := p.typesCache[typeSpec]; cached != nil {
 		return cached
 	}
 
-	t, err := p.resolveType(typeSpec)
+	t, err := p.lookupType(typeSpec)
 	if err != nil {
 		panic(fmt.Sprintf("error looking up type %s: %s", typeSpec, err))
 	}
@@ -35,7 +35,7 @@ func (p *Package) ResolveType(typeSpec string) types.Type {
 	return t
 }
 
-func (p *Package) resolveType(typeSpec string) (types.Type, error) {
+func (p *Package) lookupType(typeSpec string) (types.Type, error) {
 	finalSlash := strings.LastIndexByte(typeSpec, '/')
 	firstDotAfterLastSlash := strings.IndexByte(typeSpec[finalSlash+1:], '.')
 
@@ -83,19 +83,19 @@ func (p *Package) resolveType(typeSpec string) (types.Type, error) {
 
 // Look up a types.Object based on name.
 //
-//   ResolveObject("io.EOF")         // yields *types.Var
-//   ResolveObject("io.Copy")        // yields *types.Func
-//   ResolveObject("io.Reader")      // yields *types.TypeName
-//   ResolveObject("io.Reader.Read") // yields *types.Func
-//   ResolveObject("io.pipe.data")   // yields *types.Var
+//   LookupObject("io.EOF")         // yields *types.Var
+//   LookupObject("io.Copy")        // yields *types.Func
+//   LookupObject("io.Reader")      // yields *types.TypeName
+//   LookupObject("io.Reader.Read") // yields *types.Func
+//   LookupObject("io.pipe.data")   // yields *types.Var
 //
-// If an error occurs or the object cannot be found, ResolveObject() panics.
-func (p *Package) ResolveObject(objSpec string) types.Object {
+// If an error occurs or the object cannot be found, LookupObject() panics.
+func (p *Package) LookupObject(objSpec string) types.Object {
 	if cached := p.objectsCache[objSpec]; cached != nil {
 		return cached
 	}
 
-	o, err := p.resolveObject(objSpec)
+	o, err := p.lookupObject(objSpec)
 	if err != nil {
 		panic(fmt.Sprintf("error looking up object %s: %s", objSpec, err))
 	}
@@ -108,7 +108,7 @@ func (p *Package) ResolveObject(objSpec string) types.Object {
 	return o
 }
 
-func (p *Package) resolveObject(objSpec string) (types.Object, error) {
+func (p *Package) lookupObject(objSpec string) (types.Object, error) {
 	finalSlash := strings.LastIndexByte(objSpec, '/')
 	firstDotAfterLastSlash := strings.IndexByte(objSpec[finalSlash+1:], '.')
 
