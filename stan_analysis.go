@@ -51,41 +51,17 @@ func (p *Package) TypeOf(e ast.Expr) types.Type {
 	return p.TypesInfo.TypeOf(e)
 }
 
-func (p *Package) SearchObjects(f func(types.Object) bool) []types.Object {
-	var ret []types.Object
+func (p *Package) IterateObjects(f func(types.Object)) {
 	for obj := range p.spans {
-		if f == nil || f(obj) {
-			ret = append(ret, obj)
-		}
+		f(obj)
 	}
 	for _, obj := range p.TypesInfo.Implicits {
-		if f == nil || f(obj) {
-			ret = append(ret, obj)
-		}
+		f(obj)
 	}
-	return ret
 }
 
 func (p *Package) String() string {
 	return p.Path()
-}
-
-type Packages []*Package
-
-func (ps Packages) Walk(fn func(*Package, ast.Node, Ancestors)) {
-	for _, p := range ps {
-		WalkAST(p.Node, func(n ast.Node, ancs Ancestors) {
-			fn(p, n, ancs)
-		})
-	}
-}
-
-func (ps Packages) IterateFiles(fn func(fileName string, file *ast.File)) {
-	for _, p := range ps {
-		for name, f := range p.Node.Files {
-			fn(name, f)
-		}
-	}
 }
 
 var (
@@ -100,7 +76,7 @@ type importNode struct {
 }
 
 // Parse all go packages in pkgPaths (not recursive).
-func Pkgs(pkgPaths ...string) Packages {
+func Pkgs(pkgPaths ...string) []*Package {
 	// keep it simple
 	loadPackagesMu.Lock()
 	defer loadPackagesMu.Unlock()

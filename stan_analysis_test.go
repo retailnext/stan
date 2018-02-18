@@ -31,9 +31,8 @@ func TestNotInBuild(t *testing.T) {
 	}
 
 	got := make(map[string]bool)
-	bar.SearchObjects(func(o types.Object) bool {
+	bar.IterateObjects(func(o types.Object) {
 		got[o.Name()] = true
-		return true
 	})
 
 	for _, e := range expected {
@@ -43,17 +42,21 @@ func TestNotInBuild(t *testing.T) {
 	}
 }
 
-// Make sure SearchObjects finds implicitly defined
+// Make sure IterateObjects finds implicitly defined
 // objects as well
 func TestImplicitObjects(t *testing.T) {
 	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
 
 	typ := foo.LookupType("github.com/retailnext/stan/internal/foo.ImplicitOnlyType")
-	objs := foo.SearchObjects(func(o types.Object) bool {
+
+	var objs []types.Object
+	foo.IterateObjects(func(o types.Object) {
 		if _, ok := o.(*types.TypeName); ok {
-			return false
+			return
 		}
-		return types.Identical(o.Type(), typ)
+		if types.Identical(o.Type(), typ) {
+			objs = append(objs, o)
+		}
 	})
 
 	// one obj for implicit case def, one for use within case

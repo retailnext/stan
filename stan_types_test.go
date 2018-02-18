@@ -19,8 +19,12 @@ func TestLookup(t *testing.T) {
 		// show that lookupd type works for both a package that imports the type
 		// and the package that defines it
 		barType := pkg.LookupType("github.com/retailnext/stan/internal/bar.BarType")
-		objs := pkg.SearchObjects(func(o types.Object) bool {
-			return types.Identical(o.Type(), barType)
+
+		var objs []types.Object
+		pkg.IterateObjects(func(o types.Object) {
+			if types.Identical(o.Type(), barType) {
+				objs = append(objs, o)
+			}
 		})
 		if len(objs) == 0 {
 			t.Errorf("%s has no objects of type %s", pkg.Path(), barType)
@@ -63,7 +67,7 @@ func TestXTestPackage(t *testing.T) {
 
 	// if you ask for package directly, you get code package
 	singleFoo := Pkgs("github.com/retailnext/stan/internal/foo")
-	if !reflect.DeepEqual(singleFoo, Packages{foo[0]}) {
+	if !reflect.DeepEqual(singleFoo, []*Package{foo[0]}) {
 		t.Errorf("got %v", singleFoo)
 	}
 }

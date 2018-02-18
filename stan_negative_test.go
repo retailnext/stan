@@ -38,12 +38,10 @@ func DontLook() {
 func myTest(pkg *Package) []error {
 	var ret []error
 
-	pkg.SearchObjects(func(o types.Object) bool {
+	pkg.IterateObjects(func(o types.Object) {
 		if o.Name() == "Banana" {
 			ret = append(ret, fmt.Errorf("Object using the forbidden name at %s", pkg.Pos(o)))
 		}
-
-		return false
 	})
 
 	return ret
