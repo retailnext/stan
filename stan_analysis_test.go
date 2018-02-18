@@ -4,7 +4,9 @@
 package stan
 
 import (
+	"fmt"
 	"go/types"
+	"reflect"
 	"testing"
 )
 
@@ -57,5 +59,38 @@ func TestImplicitObjects(t *testing.T) {
 	// one obj for implicit case def, one for use within case
 	if l := len(objs); l != 2 {
 		t.Errorf("found %d objs", l)
+	}
+}
+
+func TestAncestorsOf(t *testing.T) {
+	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
+
+	barFunc := foo.LookupObject("github.com/retailnext/stan/internal/bar.BarFunc")
+
+	uses := foo.SpanOf(barFunc).Uses
+
+	if len(uses) != 1 {
+		t.Fatalf("got %d uses", len(uses))
+	}
+
+	ancs := foo.AncestorsOf(uses[0])
+
+	var got []string
+	for _, a := range ancs {
+		got = append(got, fmt.Sprintf("%T", a))
+	}
+
+	expected := []string{
+		"*ast.Package",
+		"*ast.File",
+		"*ast.FuncDecl",
+		"*ast.BlockStmt",
+		"*ast.AssignStmt",
+		"*ast.CallExpr",
+		"*ast.SelectorExpr",
+	}
+
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("got %v", got)
 	}
 }

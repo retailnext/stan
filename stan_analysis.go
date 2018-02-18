@@ -233,6 +233,9 @@ func (w *astWalker) Visit(node ast.Node) ast.Visitor {
 	return w
 }
 
+// Walk the AST starting rooted at n yielding the slice of ancestors for
+// each node visited. The ancestors slice is mutated during traversal so
+// be sure to copy() the ancestors if you want to save them off.
 func WalkAST(n ast.Node, fn func(node ast.Node, ancs Ancestors)) {
 	if n == nil {
 		panic(fmt.Sprintf("nil ast.Node passed to WalkAST"))
@@ -242,4 +245,23 @@ func WalkAST(n ast.Node, fn func(node ast.Node, ancs Ancestors)) {
 		fn: fn,
 	}
 	ast.Walk(walker, n)
+}
+
+// Look up ancestor nodes of given node. AncestorsOf panics if the target node
+// is not found in p's AST. If you need the ancestors of many nodes you may be
+// better off walking the AST once yourself.
+func (p *Package) AncestorsOf(target ast.Node) Ancestors {
+	var ret Ancestors
+	WalkAST(p.Node, func(node ast.Node, ancs Ancestors) {
+		if node == target {
+			ret = make(Ancestors, len(ancs))
+			copy(ret, ancs)
+		}
+	})
+
+	if ret == nil {
+		panic("node not found")
+	}
+
+	return ret
 }
