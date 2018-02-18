@@ -16,10 +16,9 @@ import (
 
 func typeCheck(pkg *parsedPackage) *Package {
 	config := &types.Config{
-		Importer:    imp,
-		Error:       func(error) {},
-		Sizes:       types.SizesFor("gc", build.Default.GOARCH),
-		FakeImportC: true,
+		Importer: imp,
+		Error:    func(err error) {},
+		Sizes:    types.SizesFor("gc", build.Default.GOARCH),
 	}
 	info := types.Info{
 		Types:     make(map[ast.Expr]types.TypeAndValue),

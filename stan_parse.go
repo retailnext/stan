@@ -291,6 +291,42 @@ func parseDir(dir string) (*parsedPackage, *parsedPackage, error) {
 
 	pkgs := make(map[string]*parsedPackage)
 
+	var hasCgo bool
+Files:
+	for _, f := range astFiles {
+		for _, imp := range f.Imports {
+			if strings.Trim(imp.Path.Value, "`\"") == "C" {
+				hasCgo = true
+				break Files
+			}
+		}
+	}
+
+	if hasCgo {
+		bp, err := build.ImportDir(dir, 0)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		cgoFiles, err := processCgoFiles(bp, fset, nil, 0)
+		if err != nil {
+			return nil, nil, err
+		}
+
+	CgoFiles:
+		for _, cf := range cgoFiles {
+			for ai, af := range astFiles {
+				if fset.Position(af.Pos()).Filename == fset.Position(cf.Pos()).Filename {
+					astFiles[ai] = cf
+					continue CgoFiles
+				}
+			}
+
+			// no match, add as additional file
+			astFiles = append(astFiles, cf)
+		}
+	}
+
 	for i, f := range astFiles {
 		pkg := pkgs[f.Name.Name]
 		if pkg == nil {
@@ -304,24 +340,33 @@ func parseDir(dir string) (*parsedPackage, *parsedPackage, error) {
 			pkgs[f.Name.Name] = pkg
 		}
 
+		fileName := fset.Position(f.Pos()).Filename
+		baseName := filepath.Base(fileName)
+
 		ctx.OpenFile = func(p string) (io.ReadCloser, error) {
 			if p != goFileNames[i] {
-				panic(fmt.Sprintf("context asked for unexpected file: %s != %s", p, goFileNames[i]))
+				panic(fmt.Sprintf("context asked for unexpected file: %s != %s", p, fileName))
 			}
 			return ioutil.NopCloser(bytes.NewReader(goFileContents[i])), nil
 		}
 
-		match, err := ctx.MatchFile(dir, filepath.Base(goFileNames[i]))
-		if err != nil {
-			return nil, nil, err
+		var match bool
+		if baseName == "C" {
+			match = true
+		} else {
+			match, err = ctx.MatchFile(dir, baseName)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
+
 		if match {
 			pkg.buildFiles = append(pkg.buildFiles, f)
 		} else {
 			pkg.nonBuildFiles = append(pkg.nonBuildFiles, f)
 		}
 
-		pkg.pkg.Files[goFileNames[i]] = f
+		pkg.pkg.Files[fileName] = f
 	}
 
 	var codePkg, xtestPkg *parsedPackage
