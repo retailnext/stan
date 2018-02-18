@@ -258,8 +258,6 @@ func parseDir(dir string) (*parsedPackage, *parsedPackage, error) {
 	errors := make([]error, len(goFileNames))
 	goFileContents := make([][]byte, len(goFileNames))
 
-	fset := token.NewFileSet()
-
 	var wg sync.WaitGroup
 	wg.Add(len(goFileNames))
 

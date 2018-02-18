@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"go/types"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -93,6 +94,12 @@ var (
 	loadPackagesMu sync.Mutex
 )
 
+type importNode struct {
+	pkg        *parsedPackage
+	imports    map[string]*importNode
+	importedBy map[string]*importNode
+}
+
 // Parse all go packages in pkgPaths (not recursive).
 func Pkgs(pkgPaths ...string) Packages {
 	// keep it simple
@@ -116,53 +123,81 @@ func Pkgs(pkgPaths ...string) Packages {
 		return ret
 	}
 
-	for i, pkgs := range findAndParse(needLookup) {
-		var (
-			wg             sync.WaitGroup
-			mu             sync.Mutex
-			loadedPackages []*Package
-		)
-
+	var (
+		parsedPkgs = findAndParse(needLookup)
+		nodes      = make(map[string]*importNode)
+	)
+	for _, pkgs := range parsedPkgs {
 		for _, pkg := range pkgs {
-			pkg := pkg
-
-			if cached, found := packagesCache[pkg.path]; found {
-				mu.Lock()
-				loadedPackages = append(loadedPackages, cached...)
-				mu.Unlock()
+			if _, found := packagesCache[pkg.path]; found {
 				continue
 			}
+			nodes[pkg.path] = &importNode{
+				pkg:        pkg,
+				imports:    make(map[string]*importNode),
+				importedBy: make(map[string]*importNode),
+			}
+		}
+	}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+	// create directed acyclic graph of package imports
+	for _, n := range nodes {
+		for _, f := range n.pkg.pkg.Files {
+			for _, imp := range f.Imports {
+				// not right for vendor case, but does not cause incorrect
+				// behavior (does cause potential additional importer call)
+				path := strings.Trim(imp.Path.Value, `"`)
+				if other := nodes[path]; other != nil {
+					other.importedBy[n.pkg.path] = n
+					n.imports[path] = other
+				}
+			}
+		}
+	}
 
-				staticPkg := typeCheck(pkg)
-
-				mu.Lock()
-				loadedPackages = append(loadedPackages, staticPkg)
-				mu.Unlock()
-			}()
+	// walk graph from leaf nodes so we know we have not encountered any importers
+	// of the current node yet
+	for len(nodes) > 0 {
+		startSize := len(nodes)
+		for id, n := range nodes {
+			if len(n.imports) == 0 {
+				checked := typeCheck(n.pkg)
+				packagesCache[n.pkg.path] = []*Package{checked}
+				// stick our type checked *types.Package into the importer map to
+				// avoid extra work importing this package from other packages
+				if imports[n.pkg.path] == nil {
+					imports[n.pkg.path] = checked.TypesPkg
+				}
+				for _, importsMe := range n.importedBy {
+					delete(importsMe.imports, n.pkg.path)
+				}
+				delete(nodes, id)
+			}
 		}
 
-		wg.Wait()
+		if len(nodes) == startSize {
+			// We probably have an import loop, but it is possible it isn't a loop due
+			// to vendoring. Type check remaining packages in un-optimized order.
+			for _, n := range nodes {
+				checked := typeCheck(n.pkg)
+				packagesCache[n.pkg.path] = []*Package{checked}
+			}
 
-		if len(loadedPackages) == 0 {
-			panic(fmt.Sprintf("no packages found for %s", needLookup[i]))
+			break
 		}
+	}
 
-		// sort packages so things are consistent in tests
-		sort.Slice(loadedPackages, func(i, j int) bool {
-			return loadedPackages[i].Path() < loadedPackages[j].Path()
+	for i, pkgs := range parsedPkgs {
+		var loaded []*Package
+		for _, pkg := range pkgs {
+			loaded = append(loaded, packagesCache[pkg.path]...)
+		}
+		// sort packages so ordering is deterministic
+		sort.Slice(loaded, func(i, j int) bool {
+			return loaded[i].Path() < loaded[j].Path()
 		})
-
-		packagesCache[needLookup[i]] = loadedPackages
-
-		// make sure each package is cached individually as well
-		for _, pkg := range loadedPackages {
-			packagesCache[pkg.Path()] = []*Package{pkg}
-		}
-		ret = append(ret, loadedPackages...)
+		packagesCache[needLookup[i]] = loaded
+		ret = append(ret, loaded...)
 	}
 
 	return ret
