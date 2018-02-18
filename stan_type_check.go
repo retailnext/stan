@@ -15,10 +15,29 @@ import (
 )
 
 func typeCheck(pkg *parsedPackage) *Package {
+	var hardError error
+
 	config := &types.Config{
 		Importer: imp,
-		Error:    func(err error) {},
-		Sizes:    types.SizesFor("gc", build.Default.GOARCH),
+		Error: func(err error) {
+			te := err.(types.Error)
+
+			if te.Soft {
+				// soft errors are ignorable
+				return
+			}
+
+			fileName := pkg.fset.Position(te.Pos).Filename
+			for _, nb := range pkg.nonBuildFiles {
+				if fileName == pkg.fset.Position(nb.Pos()).Filename {
+					// we know non-buildable files can have OS specific stuff we can't handle
+					return
+				}
+			}
+
+			hardError = err
+		},
+		Sizes: types.SizesFor("gc", build.Default.GOARCH),
 	}
 	info := types.Info{
 		Types:     make(map[ast.Expr]types.TypeAndValue),
@@ -33,9 +52,11 @@ func typeCheck(pkg *parsedPackage) *Package {
 	// objects, the buildable file keeps the original name
 	allFiles := append(pkg.buildFiles, pkg.nonBuildFiles...)
 
-	// type check as much as you can and ignore errors (there will
-	// be "expected" errors from cgo, build constraints, etc)
 	tPkg, _ := config.Check(pkg.path, pkg.fset, allFiles, &info)
+
+	if hardError != nil {
+		panic(fmt.Sprintf("type checker error: %s", hardError))
+	}
 
 	spans := make(map[types.Object]Span)
 

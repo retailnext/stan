@@ -3,6 +3,8 @@
 
 package bar
 
+import "syscall"
+
 var sharedVar string
 
 const sharedConst = 456
@@ -11,4 +13,6 @@ func shared() {
 }
 
 func linuxSpecific() {
+	var sysInfo syscall.Sysinfo_t
+	syscall.Sysinfo(&sysInfo)
 }
