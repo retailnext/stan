@@ -16,3 +16,5 @@ func linuxSpecific() {
 	var sysInfo syscall.Sysinfo_t
 	syscall.Sysinfo(&sysInfo)
 }
+
+func (b BarType) someMethod() {}

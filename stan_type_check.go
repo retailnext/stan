@@ -93,48 +93,79 @@ func typeCheck(pkg *parsedPackage) *Package {
 	}
 }
 
+type nameWithRecv struct {
+	recv string
+	name string
+}
+
 // find any duplicate objects and rename them in the non buildable files
 // so they are at least present after type checking
 func dedupeObjects(buildable, nonBuildable []*ast.File) {
-	topLevelNames := make(map[string]int)
 
-	// seed top level names from buildale files
-	for _, f := range buildable {
-		for n, _ := range f.Scope.Objects {
-			topLevelNames[n]++
-		}
-	}
-
-	for _, f := range nonBuildable {
-		for bn, o := range f.Scope.Objects {
-			if c := topLevelNames[bn]; c > 0 {
-				// if someone has already used this name then make
-				// a new one
-				newName := fmt.Sprintf("%s_nobuild%d", bn, c)
-
-				// in case new name happens to already in use
-				for topLevelNames[newName] > 0 {
-					topLevelNames[bn]++
-					newName = fmt.Sprintf("%s_nobuild%d", bn, topLevelNames[bn])
-				}
-
-				o.Name = newName
-				delete(f.Scope.Objects, bn)
-				f.Scope.Objects[newName] = o
-
-				switch d := o.Decl.(type) {
-				case *ast.FuncDecl:
-					d.Name.Name = newName
-				case *ast.ValueSpec:
-					for _, vn := range d.Names {
-						if vn.Name == bn {
-							vn.Name = newName
+	// we need to check all file level declarations (variables, constants, functions
+	// and methods)
+	iterNames := func(f *ast.File, cb func(nameId *ast.Ident, name nameWithRecv)) {
+		for _, d := range f.Decls {
+			switch v := d.(type) {
+			case *ast.FuncDecl:
+				var recv string
+				if v.Recv != nil {
+					switch rv := v.Recv.List[0].Type.(type) {
+					case *ast.Ident:
+						recv = rv.Name
+					case *ast.StarExpr:
+						id, _ := rv.X.(*ast.Ident)
+						if id != nil {
+							recv = id.Name
 						}
+					}
+					if recv == "" {
+						// weren't able to figure out receiver name
+						continue
+					}
+				}
+				cb(v.Name, nameWithRecv{name: v.Name.Name, recv: recv})
+			case *ast.GenDecl:
+				for _, spec := range v.Specs {
+					switch v := spec.(type) {
+					case *ast.ValueSpec:
+						for _, id := range v.Names {
+							cb(id, nameWithRecv{name: id.Name})
+						}
+					case *ast.TypeSpec:
+						cb(v.Name, nameWithRecv{name: v.Name.Name})
 					}
 				}
 			}
-
-			topLevelNames[bn]++
 		}
+	}
+
+	usedNames := make(map[nameWithRecv]int)
+
+	// seed top level names from buildable files
+	for _, f := range buildable {
+		iterNames(f, func(nameId *ast.Ident, name nameWithRecv) {
+			usedNames[name]++
+		})
+	}
+
+	for _, f := range nonBuildable {
+		iterNames(f, func(nameId *ast.Ident, name nameWithRecv) {
+			if c := usedNames[name]; c > 0 {
+				// if someone has already used this name then make
+				// a new one
+				newName := fmt.Sprintf("%s_nobuild%d", name.name, c)
+
+				// in case new name happens to already be in use
+				for usedNames[nameWithRecv{name: newName, recv: name.recv}] > 0 {
+					usedNames[name]++
+					newName = fmt.Sprintf("%s_nobuild%d", name.name, usedNames[name])
+				}
+
+				usedNames[name]++
+
+				nameId.Name = newName
+			}
+		})
 	}
 }

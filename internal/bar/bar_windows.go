@@ -15,3 +15,5 @@ func windowsSpecific() {
 
 func windowsDarwin() {
 }
+
+func (b BarType) someMethod() {}
