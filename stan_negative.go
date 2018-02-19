@@ -47,5 +47,10 @@ func EvalTest(st StaticTest, code string) []error {
 
 	pkg.path = "fake/" + packageName
 
-	return st(typeCheck(pkg))
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(fmt.Sprintf("os.Getwd() error: %s", err))
+	}
+
+	return st(typeCheck(pkg, importerWithDirOverride(map[string]string{tmpDir: wd})))
 }

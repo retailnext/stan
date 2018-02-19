@@ -14,11 +14,15 @@ import (
 	"go/types"
 )
 
-func typeCheck(pkg *parsedPackage) *Package {
+func typeCheck(pkg *parsedPackage, importer types.ImporterFrom) *Package {
+	if importer == nil {
+		importer = imp
+	}
+
 	var hardError error
 
 	config := &types.Config{
-		Importer: imp,
+		Importer: importer,
 		Error: func(err error) {
 			te := err.(types.Error)
 

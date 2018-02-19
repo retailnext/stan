@@ -136,7 +136,7 @@ func Pkgs(pkgPaths ...string) []*Package {
 		startSize := len(nodes)
 		for id, n := range nodes {
 			if len(n.imports) == 0 {
-				checked := typeCheck(n.pkg)
+				checked := typeCheck(n.pkg, nil)
 				packagesCache[n.pkg.path] = []*Package{checked}
 				// stick our type checked *types.Package into the importer map to
 				// avoid extra work importing this package from other packages
@@ -154,7 +154,7 @@ func Pkgs(pkgPaths ...string) []*Package {
 			// We probably have an import loop, but it is possible it isn't a loop due
 			// to vendoring. Type check remaining packages in un-optimized order.
 			for _, n := range nodes {
-				checked := typeCheck(n.pkg)
+				checked := typeCheck(n.pkg, nil)
 				packagesCache[n.pkg.path] = []*Package{checked}
 			}
 
