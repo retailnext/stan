@@ -9,32 +9,43 @@ package stan
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
 	"go/token"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
 type StaticTest func(*Package) []error
 
 func EvalTest(st StaticTest, code string) []error {
-	fset := token.NewFileSet()
-
-	fakeFileName := "fake_package.go"
-
-	f, err := parser.ParseFile(fset, fakeFileName, code, 0)
+	tmpDir, err := ioutil.TempDir("", "stan_fake_package")
 	if err != nil {
-		panic(fmt.Sprintf("error parsing code: %s", err))
+		panic(fmt.Sprintf("error making temp dir: %s", err))
 	}
 
-	pkg := &parsedPackage{
-		pkg: &ast.Package{
-			Name:  f.Name.Name,
-			Files: map[string]*ast.File{fakeFileName: f},
-		},
-		fset:       fset,
-		buildFiles: []*ast.File{f},
-		path:       "fake/" + f.Name.Name,
+	defer os.RemoveAll(tmpDir)
+
+	err = ioutil.WriteFile(filepath.Join(tmpDir, "fake_package.go"), []byte(code), 0644)
+	if err != nil {
+		panic(fmt.Sprintf("error writing fake_package.go: %s", err))
 	}
+
+	codePkg, xtestPkg, err := parseDir(tmpDir, token.NewFileSet())
+	if err != nil {
+		panic(fmt.Sprintf("error parsing fake package: %s", err))
+	}
+
+	pkg := codePkg
+	if pkg == nil {
+		pkg = xtestPkg
+	}
+
+	var packageName string
+	for _, f := range pkg.pkg.Files {
+		packageName = f.Name.Name
+	}
+
+	pkg.path = "fake/" + packageName
 
 	return st(typeCheck(pkg))
 }

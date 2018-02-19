@@ -115,7 +115,7 @@ func findAndParseWildcard(paths []string) [][]*parsedPackage {
 				return nil
 			}
 
-			code, xtest, err := parseDir(path)
+			code, xtest, err := parseDir(path, fset)
 			if err != nil {
 				panic(fmt.Sprintf("error parsing %s: %s", path, err))
 			}
@@ -176,7 +176,7 @@ func findAndParseWildcardLocal(pattern string) []*parsedPackage {
 			return nil
 		}
 
-		code, xtest, err := parseDir(path)
+		code, xtest, err := parseDir(path, fset)
 		if err != nil {
 			panic(fmt.Sprintf("error parsing %s: %s", path, err))
 		}
@@ -217,7 +217,7 @@ func findAndParseSingle(importPath string) *parsedPackage {
 		panic(fmt.Sprintf("could not find package %s", importPath))
 	}
 
-	codePkg, testxPkg, err := parseDir(dir)
+	codePkg, testxPkg, err := parseDir(dir, fset)
 	if err != nil {
 		panic(fmt.Sprintf("error parsing %s: %s", dir, err))
 	}
@@ -238,7 +238,7 @@ func findAndParseSingle(importPath string) *parsedPackage {
 	}
 }
 
-func parseDir(dir string) (*parsedPackage, *parsedPackage, error) {
+func parseDir(dir string, fset *token.FileSet) (*parsedPackage, *parsedPackage, error) {
 	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, nil, err

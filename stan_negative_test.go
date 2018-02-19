@@ -25,8 +25,12 @@ func DontLook() {
 	got = EvalTest(myTest, `
 package banana
 
+// void banana_func() { }
+import "C"
+
 func DontLook() {
 	var Monkey = "banana"
+	_ = C.banana_func()
 }
 `)
 
