@@ -19,7 +19,7 @@ type Package struct {
 	TypesInfo *types.Info
 	TypesPkg  *types.Package
 
-	spans        map[types.Object]Span
+	lifetimes    map[types.Object]ObjectLifetime
 	typesCache   map[string]types.Type
 	objectsCache map[string]types.Object
 }
@@ -52,7 +52,7 @@ func (p *Package) TypeOf(e ast.Expr) types.Type {
 }
 
 func (p *Package) IterateObjects(f func(types.Object)) {
-	for obj := range p.spans {
+	for obj := range p.lifetimes {
 		f(obj)
 	}
 	for _, obj := range p.TypesInfo.Implicits {
@@ -178,16 +178,28 @@ func Pkgs(pkgPaths ...string) []*Package {
 	return ret
 }
 
-type Span struct {
+type ObjectLifetime struct {
 	First, Last token.Pos
+	Def         *ast.Ident
 	Uses        []*ast.Ident
 }
 
-func (p *Package) SpanOf(o types.Object) Span {
-	return p.spans[o]
+func (p *Package) LifetimeOf(o types.Object) ObjectLifetime {
+	return p.lifetimes[o]
 }
 
 type Ancestors []ast.Node
+
+func (a Ancestors) Next() ast.Node {
+	if len(a) == 0 {
+		return nil
+	}
+	return a[len(a)-1]
+}
+
+func (a Ancestors) Advance() Ancestors {
+	return a[:len(a)-1]
+}
 
 type astWalker struct {
 	ancestors Ancestors
@@ -237,6 +249,49 @@ func (p *Package) AncestorsOf(target ast.Node) Ancestors {
 
 	if ret == nil {
 		panic("node not found")
+	}
+
+	return ret
+}
+
+type Invocation struct {
+	Invocant types.Object
+	Args     []ast.Expr
+	Call     *ast.CallExpr
+}
+
+func (p *Package) InvocationsOf(obj types.Object) []Invocation {
+	fn, _ := obj.(*types.Func)
+	if fn == nil {
+		panic(fmt.Sprintf("object %[1]s is not *types.Func (%[1]T)", obj))
+	}
+
+	var ret []Invocation
+	for _, use := range p.LifetimeOf(obj).Uses {
+		ancs := p.AncestorsOf(use)
+
+		var invocant types.Object
+		if sel, _ := ancs.Next().(*ast.SelectorExpr); sel != nil {
+			switch x := sel.X.(type) {
+			case *ast.SelectorExpr:
+				invocant = p.ObjectOf(x.Sel)
+			case *ast.Ident:
+				invocant = p.ObjectOf(x)
+			}
+
+			ancs = ancs.Advance()
+		}
+
+		call, _ := ancs.Next().(*ast.CallExpr)
+		if call == nil {
+			continue
+		}
+
+		ret = append(ret, Invocation{
+			Invocant: invocant,
+			Args:     call.Args,
+			Call:     call,
+		})
 	}
 
 	return ret

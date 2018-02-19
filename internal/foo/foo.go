@@ -28,3 +28,16 @@ func foo() {
 		_ = v
 	}
 }
+
+type structA struct {
+	b structB
+}
+
+type structB struct{}
+
+func (b structB) structFunc() {}
+
+func invocations() {
+	a := structA{}
+	a.b.structFunc()
+}

@@ -134,6 +134,20 @@ func (p *Package) lookupObject(objSpec string) (types.Object, error) {
 
 	obj := tPkg.Scope().Lookup(parts[0])
 	if obj == nil {
+		for _, imp := range p.TypesInfo.Implicits {
+			pi, _ := imp.(*types.PkgName)
+			if pi == nil {
+				continue
+			}
+
+			if pi.Name() == parts[0] {
+				obj = imp
+				break
+			}
+		}
+	}
+
+	if obj == nil {
 		return nil, nil
 	}
 

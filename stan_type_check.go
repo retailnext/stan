@@ -62,14 +62,14 @@ func typeCheck(pkg *parsedPackage, importer types.ImporterFrom) *Package {
 		panic(fmt.Sprintf("type checker error: %s", hardError))
 	}
 
-	spans := make(map[types.Object]Span)
+	lifetimes := make(map[types.Object]ObjectLifetime)
 
-	updateSpans := func(objs map[*ast.Ident]types.Object, isUse bool) {
+	updateLifetimes := func(objs map[*ast.Ident]types.Object, isUse bool) {
 		for ident, obj := range objs {
 			if obj == nil {
 				continue
 			}
-			sp, ok := spans[obj]
+			sp, ok := lifetimes[obj]
 			if !ok || ident.Pos() < sp.First {
 				sp.First = ident.Pos()
 			}
@@ -78,20 +78,22 @@ func typeCheck(pkg *parsedPackage, importer types.ImporterFrom) *Package {
 			}
 			if isUse {
 				sp.Uses = append(sp.Uses, ident)
+			} else {
+				sp.Def = ident
 			}
-			spans[obj] = sp
+			lifetimes[obj] = sp
 		}
 	}
 
-	updateSpans(info.Defs, false)
-	updateSpans(info.Uses, true)
+	updateLifetimes(info.Defs, false)
+	updateLifetimes(info.Uses, true)
 
 	return &Package{
 		Node:         pkg.pkg,
 		Fset:         pkg.fset,
 		TypesInfo:    &info,
 		TypesPkg:     tPkg,
-		spans:        spans,
+		lifetimes:    lifetimes,
 		typesCache:   make(map[string]types.Type),
 		objectsCache: make(map[string]types.Object),
 	}

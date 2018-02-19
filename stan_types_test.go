@@ -32,7 +32,7 @@ func TestLookup(t *testing.T) {
 
 		// similar, but for object
 		barObj := pkg.LookupObject("github.com/retailnext/stan/internal/bar.BarVar")
-		if len(pkg.SpanOf(barObj).Uses) == 0 {
+		if len(pkg.LifetimeOf(barObj).Uses) == 0 {
 			t.Errorf("%s has no uses of object %s", pkg.Path(), barObj)
 		}
 	}

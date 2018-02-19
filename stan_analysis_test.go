@@ -70,7 +70,7 @@ func TestAncestorsOf(t *testing.T) {
 
 	barFunc := foo.LookupObject("github.com/retailnext/stan/internal/bar.BarFunc")
 
-	uses := foo.SpanOf(barFunc).Uses
+	uses := foo.LifetimeOf(barFunc).Uses
 
 	if len(uses) != 1 {
 		t.Fatalf("got %d uses", len(uses))
@@ -95,5 +95,25 @@ func TestAncestorsOf(t *testing.T) {
 
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("got %v", got)
+	}
+}
+
+func TestInvocationsOf(t *testing.T) {
+	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
+
+	invs := foo.InvocationsOf(foo.LookupObject("github.com/retailnext/stan/internal/bar.BarFunc"))
+	if len(invs) != 1 {
+		t.Fatalf("got %d", len(invs))
+	}
+	if invs[0].Invocant != foo.LookupObject("github.com/retailnext/stan/internal/foo.bar") {
+		t.Errorf("got %s", invs[0].Invocant)
+	}
+
+	invs = foo.InvocationsOf(foo.LookupObject("github.com/retailnext/stan/internal/foo.structB.structFunc"))
+	if len(invs) != 1 {
+		t.Fatalf("got %d", len(invs))
+	}
+	if invs[0].Invocant.Name() != "b" {
+		t.Errorf("got %s", invs[0].Invocant.Name())
 	}
 }
