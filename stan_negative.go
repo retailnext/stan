@@ -17,6 +17,9 @@ import (
 
 type StaticTest func(*Package) []error
 
+// EvalTest() parses and type checks code into a *Package, and then invokes
+// st with that package. EvalTest is useful for unit testing static analysis
+// tests. Vendor imports operate as if the code was run from os.Getwd().
 func EvalTest(st StaticTest, code string) []error {
 	tmpDir, err := ioutil.TempDir("", "stan_fake_package")
 	if err != nil {

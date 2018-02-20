@@ -13,6 +13,8 @@ import (
 	"sync"
 )
 
+// Package contains combines the *ast.Package and *types.Package into a single
+// object.
 type Package struct {
 	Node      *ast.Package
 	Fset      *token.FileSet
@@ -28,6 +30,9 @@ type Poser interface {
 	Pos() token.Pos
 }
 
+// Pos() returns the position of an ast.Node or types.Object in the file set.
+// Convenient for error reporting, token.Position.String() yields
+// file:line:column.
 func (p *Package) Pos(n Poser) token.Position {
 	if n == nil {
 		panic("nil passed to Pos()")
@@ -35,22 +40,29 @@ func (p *Package) Pos(n Poser) token.Position {
 	return p.Fset.Position(n.Pos())
 }
 
+// Path() returns the p's unique import path (including vendor/).
 func (p *Package) Path() string {
 	return p.TypesPkg.Path()
 }
 
+// Files() returns a map of file name to *ast.File for the files that make up p.
 func (p *Package) Files() map[string]*ast.File {
 	return p.Node.Files
 }
 
+// ObjectOf() returns the corresponding types.Object of an AST identifier. Can
+// return nil if the identifier has no corresponding types.Object.
 func (p *Package) ObjectOf(id *ast.Ident) types.Object {
 	return p.TypesInfo.ObjectOf(id)
 }
 
+// TypeOf() returns the types.Type of a given expression. Can return
+// nil if expresion not found.
 func (p *Package) TypeOf(e ast.Expr) types.Type {
 	return p.TypesInfo.TypeOf(e)
 }
 
+// IterateObjects() iterates over all types.Objects in p.
 func (p *Package) IterateObjects(f func(types.Object)) {
 	for obj := range p.lifetimes {
 		f(obj)
@@ -60,6 +72,7 @@ func (p *Package) IterateObjects(f func(types.Object)) {
 	}
 }
 
+// String() returns the import path of p.
 func (p *Package) String() string {
 	return p.Path()
 }
@@ -75,7 +88,18 @@ type importNode struct {
 	importedBy map[string]*importNode
 }
 
-// Parse all go packages in pkgPaths (not recursive).
+// Pkgs() finds, parses and type checks the packages specified by pkgPaths.
+// Wildcard "..." expressions may be used, similar to various "go" commands.
+// Pkgs() panics if there is a parse error, "hard" type check error, or if no
+// such package could be found.
+//
+// In order to maximize test coverage, Pkgs() does a few potentially unexpected
+// things to parse/check as much code as possible:
+// 	 - includes *_test.go files in packages
+// 	 - includes "XTest" _test packages as separate packages
+// 	 - attempts to invoke cgo preprocessor on cgo files so type info is available
+// 	 - loads all *.go files, even if non-buildable due to build constraints (stan will rename duplicate objects to prevent type checking errors, and ignore "hard" type check error for non-buildable files)
+//
 func Pkgs(pkgPaths ...string) []*Package {
 	// keep it simple
 	loadPackagesMu.Lock()
@@ -178,18 +202,29 @@ func Pkgs(pkgPaths ...string) []*Package {
 	return ret
 }
 
+// ObjectLifetime represents the "lifetime" of an object.
 type ObjectLifetime struct {
+	// Lexical first and last use of object
 	First, Last token.Pos
-	Def         *ast.Ident
-	Uses        []*ast.Ident
+	// Definition of object
+	Def *ast.Ident
+	// Uses of object
+	Uses []*ast.Ident
 }
 
-func (p *Package) LifetimeOf(o types.Object) ObjectLifetime {
-	return p.lifetimes[o]
+// LifetimeOf() returns an object representing the lifetime of
+// types.Object obj within p. If obj is not used by p, LifetimeOf
+// returns the zero value ObjectLifetime.
+func (p *Package) LifetimeOf(obj types.Object) ObjectLifetime {
+	return p.lifetimes[obj]
 }
 
+// Ancestors is a slice of ast.Nodes representing a node's ancestor
+// nodes in the AST. A node's direct parent is the final node in the
+// Ancestors.
 type Ancestors []ast.Node
 
+// Next() returns the next/parent node, or nil if Ancestors is empty.
 func (a Ancestors) Next() ast.Node {
 	if len(a) == 0 {
 		return nil
@@ -197,6 +232,8 @@ func (a Ancestors) Next() ast.Node {
 	return a[len(a)-1]
 }
 
+// Advance() returns a new Ancestors slice without the final/parent
+// node. Advance() panics if a is empty.
 func (a Ancestors) Advance() Ancestors {
 	return a[:len(a)-1]
 }
@@ -254,12 +291,18 @@ func (p *Package) AncestorsOf(target ast.Node) Ancestors {
 	return ret
 }
 
+// Invocation represents the invocation of a *types.Func.
 type Invocation struct {
+	// Invocant object, if available.
 	Invocant types.Object
-	Args     []ast.Expr
-	Call     *ast.CallExpr
+	// Args to function invocation
+	Args []ast.Expr
+	// Invocation's *ast.CallExpr node
+	Call *ast.CallExpr
 }
 
+// InvocationsOf() returns the invocations of obj within p. InvocationsOf
+// panics if obj is not a *types.Func.
 func (p *Package) InvocationsOf(obj types.Object) []Invocation {
 	fn, _ := obj.(*types.Func)
 	if fn == nil {
