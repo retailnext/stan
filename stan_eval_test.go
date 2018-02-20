@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-func TestNegativeTest(t *testing.T) {
-	got := EvalTest(myTest, `
+func TestEvalPkg(t *testing.T) {
+	pkg := EvalPkg(`
 package banana
 
 func DontLook() {
@@ -18,11 +18,11 @@ func DontLook() {
 }
 `)
 
-	if len(got) != 1 {
-		t.Errorf("wanted 1 error, got %v", got)
+	if errs := myTest(pkg); len(errs) != 1 {
+		t.Errorf("wanted 1 error, got %v", errs)
 	}
 
-	got = EvalTest(myTest, `
+	pkg = EvalPkg(`
 package banana
 
 // void banana_func() { }
@@ -34,8 +34,8 @@ func DontLook() {
 }
 `)
 
-	if len(got) != 0 {
-		t.Errorf("wanted 0 errors, got %v", got)
+	if errs := myTest(pkg); len(errs) != 0 {
+		t.Errorf("wanted 0 errors, got %v", errs)
 	}
 }
 

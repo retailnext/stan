@@ -15,12 +15,11 @@ import (
 	"path/filepath"
 )
 
-type StaticTest func(*Package) []error
-
-// EvalTest() parses and type checks code into a *Package, and then invokes
-// st with that package. EvalTest is useful for unit testing static analysis
-// tests. Vendor imports operate as if the code was run from os.Getwd().
-func EvalTest(st StaticTest, code string) []error {
+// EvalPkg() parses and type checks code into a *Package. EvalPkg() is useful
+// for unit testing static analysis tests. Vendor imports operate as if the
+// code was run from os.Getwd(). EvalPkg() panics if there is an error parsing
+// or type checking code.
+func EvalPkg(code string) *Package {
 	tmpDir, err := ioutil.TempDir("", "stan_fake_package")
 	if err != nil {
 		panic(fmt.Sprintf("error making temp dir: %s", err))
@@ -55,5 +54,5 @@ func EvalTest(st StaticTest, code string) []error {
 		panic(fmt.Sprintf("os.Getwd() error: %s", err))
 	}
 
-	return st(typeCheck(pkg, importerWithDirOverride(map[string]string{tmpDir: wd})))
+	return typeCheck(pkg, importerWithDirOverride(map[string]string{tmpDir: wd}))
 }
