@@ -4,16 +4,15 @@
 package stan
 
 import (
+	"go/build"
 	"go/token"
 	"go/types"
-
-	"golang.org/x/tools/go/gcexportdata"
 )
 
 var (
 	imports = make(map[string]*types.Package)
 	fset    = token.NewFileSet()
-	imp     = gcexportdata.NewImporter(fset, imports)
+	imp     = newSrcImporter(&build.Default, fset, imports)
 )
 
 type dirOverrideImporter struct {

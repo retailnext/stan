@@ -287,45 +287,14 @@ func parseDir(dir string, fset *token.FileSet) (*parsedPackage, *parsedPackage, 
 		}
 	}
 
+	astFiles, err = cgoIfRequired(nil, fset, astFiles)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	ctx := build.Default
 
 	pkgs := make(map[string]*parsedPackage)
-
-	var hasCgo bool
-Files:
-	for _, f := range astFiles {
-		for _, imp := range f.Imports {
-			if strings.Trim(imp.Path.Value, "`\"") == "C" {
-				hasCgo = true
-				break Files
-			}
-		}
-	}
-
-	if hasCgo {
-		bp, err := build.ImportDir(dir, 0)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		cgoFiles, err := processCgoFiles(bp, fset, nil, 0)
-		if err != nil {
-			return nil, nil, err
-		}
-
-	CgoFiles:
-		for _, cf := range cgoFiles {
-			for ai, af := range astFiles {
-				if fset.Position(af.Pos()).Filename == fset.Position(cf.Pos()).Filename {
-					astFiles[ai] = cf
-					continue CgoFiles
-				}
-			}
-
-			// no match, add as additional file
-			astFiles = append(astFiles, cf)
-		}
-	}
 
 	for i, f := range astFiles {
 		pkg := pkgs[f.Name.Name]
@@ -385,4 +354,49 @@ Files:
 	}
 
 	return codePkg, xtestPkg, nil
+}
+
+func cgoIfRequired(bp *build.Package, fset *token.FileSet, astFiles []*ast.File) ([]*ast.File, error) {
+	var hasCgo bool
+Files:
+	for _, f := range astFiles {
+		for _, imp := range f.Imports {
+			if strings.Trim(imp.Path.Value, "`\"") == "C" {
+				hasCgo = true
+				break Files
+			}
+		}
+	}
+
+	if !hasCgo {
+		return astFiles, nil
+	}
+
+	if bp == nil {
+		var err error
+		bp, err = build.ImportDir(filepath.Dir(fset.Position(astFiles[0].Pos()).Filename), 0)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	cgoFiles, err := processCgoFiles(bp, fset, nil, 0)
+	if err != nil {
+		return nil, err
+	}
+
+CgoFiles:
+	for _, cf := range cgoFiles {
+		for ai, af := range astFiles {
+			if fset.Position(af.Pos()).Filename == fset.Position(cf.Pos()).Filename {
+				astFiles[ai] = cf
+				continue CgoFiles
+			}
+		}
+
+		// no match, add as additional file
+		astFiles = append(astFiles, cf)
+	}
+
+	return astFiles, nil
 }
