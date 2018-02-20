@@ -2,9 +2,9 @@
 
 Short for STatic ANalysis, stan's goal is to make it easier to write custom static analysis tests for your golang project.
 
-In additional to *ast.Package, *types.Info and *types.Package, stan provides a higher level API to make it easier when your objective relates to particular objects/types.
+In addition to *ast.Package, *types.Info and *types.Package, stan provides a higher level API to make it easier when your objective relates to particular objects/types.
 
-stan's API and feature set is not stable.
+stan's API and feature set are not stable.
 
 ## Standard walk-the-AST approach
 
@@ -67,13 +67,13 @@ func checkUseTimeEqual(pkg *stan.Package) []error {
 func TestUseTimeEqual(t *testing.T) {
   // invoke static check on your code
   for _, pkg := range stan.Pkgs("your/namespace/...") {
-    for _, err := range checkUseTimeEquals(pkg) {
+    for _, err := range checkUseTimeEqual(pkg) {
       t.Error(err)
     }
   }
 
   // unit test your static test
-  errs := stan.EvalTest(checkUseTimeEqual, `
+  pkg := stan.EvalPkg(`
 package fake
 
 import "time"
@@ -86,11 +86,13 @@ func foo() {
 }
 `)
 
+  errs := checkUseTimeEqual(pkg)
+
   if len(errs) != 1 {
     t.Error("expected an error")
   }
 
-  errs = stan.EvalTest(checkUseTimeEqual, `
+  pkg = stan.EvalPkg(`
 package fake
 
 import "time"
@@ -102,6 +104,8 @@ func foo() {
   }
 }
 `)
+
+  errs = checkUseTimeEqual(pkg)
 
   if len(errs) != 0 {
     t.Error("expected no errors")
