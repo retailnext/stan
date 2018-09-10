@@ -224,18 +224,23 @@ func (p *Package) LifetimeOf(obj types.Object) ObjectLifetime {
 // Ancestors.
 type Ancestors []ast.Node
 
-// Next() returns the next/parent node, or nil if Ancestors is empty.
-func (a Ancestors) Next() ast.Node {
+// Peek() returns the closest ancestor in a, or nil if a is empty.
+func (a Ancestors) Peek() ast.Node {
 	if len(a) == 0 {
 		return nil
 	}
 	return a[len(a)-1]
 }
 
-// Advance() returns a new Ancestors slice without the final/parent
-// node. Advance() panics if a is empty.
-func (a Ancestors) Advance() Ancestors {
-	return a[:len(a)-1]
+// Pop() removes and returns the closest ancestor in a. Pop() returns nil if a
+// is empty.
+func (a *Ancestors) Pop() ast.Node {
+	if len(*a) == 0 {
+		return nil
+	}
+	ret := (*a)[len(*a)-1]
+	*a = (*a)[:len(*a)-1]
+	return ret
 }
 
 type astWalker struct {
@@ -314,7 +319,7 @@ func (p *Package) InvocationsOf(obj types.Object) []Invocation {
 		ancs := p.AncestorsOf(use)
 
 		var invocant types.Object
-		if sel, _ := ancs.Next().(*ast.SelectorExpr); sel != nil {
+		if sel, _ := ancs.Peek().(*ast.SelectorExpr); sel != nil {
 			switch x := sel.X.(type) {
 			case *ast.SelectorExpr:
 				invocant = p.ObjectOf(x.Sel)
@@ -322,10 +327,10 @@ func (p *Package) InvocationsOf(obj types.Object) []Invocation {
 				invocant = p.ObjectOf(x)
 			}
 
-			ancs = ancs.Advance()
+			ancs.Pop()
 		}
 
-		call, _ := ancs.Next().(*ast.CallExpr)
+		call, _ := ancs.Peek().(*ast.CallExpr)
 		if call == nil {
 			continue
 		}

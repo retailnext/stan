@@ -44,6 +44,7 @@ func typeCheck(pkg *parsedPackage, importer types.ImporterFrom) *Package {
 		Defs:      make(map[*ast.Ident]types.Object),
 		Uses:      make(map[*ast.Ident]types.Object),
 		Implicits: make(map[ast.Node]types.Object),
+		Scopes:    make(map[ast.Node]*types.Scope),
 	}
 
 	dedupeObjects(pkg.buildFiles, pkg.nonBuildFiles)
