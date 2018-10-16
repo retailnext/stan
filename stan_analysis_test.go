@@ -5,6 +5,7 @@ package stan
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 	"reflect"
 	"testing"
@@ -115,5 +116,24 @@ func TestInvocationsOf(t *testing.T) {
 	}
 	if invs[0].Invocant.Name() != "b" {
 		t.Errorf("got %s", invs[0].Invocant.Name())
+	}
+}
+
+func TestDeclOf(t *testing.T) {
+	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
+
+	bf := foo.LookupObject("github.com/retailnext/stan/internal/bar.BarFunc")
+	pkg, id, ancs := foo.DeclOf(bf)
+
+	if pkg != Pkgs("github.com/retailnext/stan/internal/bar")[0] {
+		t.Errorf("expected bar, was %s", pkg)
+	}
+
+	if id := id.(*ast.Ident); id.Name != "BarFunc" {
+		t.Errorf("got %s", id.Name)
+	}
+
+	if _, ok := ancs.Peek().(*ast.FuncDecl); !ok {
+		t.Errorf("expected FuncDecl, was %T", ancs.Peek())
 	}
 }

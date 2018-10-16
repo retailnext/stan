@@ -5,9 +5,12 @@ package stan
 
 import (
 	"fmt"
+	"go/ast"
 	"go/token"
 	"go/types"
 	"strings"
+
+	"golang.org/x/tools/go/ast/astutil"
 )
 
 // Look up a types.Type based on the name of a type, or an unnamed type expression.
@@ -162,4 +165,41 @@ func (p *Package) lookupObject(objSpec string) (types.Object, error) {
 	}
 
 	return obj, nil
+}
+
+// Look up where a types.Object is declared. Particularly useful for jumping to
+// the implementation of a function. otherPkg is the *Package containing the
+// declaration, node is the innermsot ast.Node of o in the declaration (often
+// *ast.Ident), and ancs is the ancestors of id.
+func (p *Package) DeclOf(o types.Object) (otherPkg *Package, node ast.Node, ancs Ancestors) {
+	if o.Pkg().Path() == p.Path() {
+		otherPkg = p
+	} else {
+		otherPkg = Pkgs(o.Pkg().Path())[0]
+	}
+
+	sourceTokenFile := p.Fset.File(o.Pos())
+
+	// Look up ast file by name rather than pos since files can be in the
+	// file set more than once (can get loaded by the importer, then loaded
+	// again by stan).
+	destASTFile := otherPkg.Files()[sourceTokenFile.Name()]
+
+	// Translate f's Pos from p's *token.File pos range to otherPkg's *token.File's.
+	destTokenFile := otherPkg.Fset.File(destASTFile.Pos())
+	destPos := o.Pos() - token.Pos(sourceTokenFile.Base()-destTokenFile.Base())
+
+	path, exact := astutil.PathEnclosingInterval(destASTFile, destPos, destPos)
+	if !exact {
+		panic("couldn't find exact ast.Node")
+	}
+
+	ancs = Ancestors(path[1:])
+	for i, j := 0, len(ancs)-1; i < j; {
+		ancs[i], ancs[j] = ancs[j], ancs[i]
+		i++
+		j--
+	}
+
+	return otherPkg, path[0], Ancestors(ancs)
 }
