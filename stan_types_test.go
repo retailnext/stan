@@ -6,16 +6,11 @@ package stan
 import (
 	"go/types"
 	"reflect"
-	"strings"
 	"testing"
 )
 
 func TestLookup(t *testing.T) {
-	for _, pkg := range Pkgs("github.com/retailnext/stan/internal/...") {
-		if strings.HasSuffix(pkg.Path(), ":xtest") {
-			continue
-		}
-
+	for _, pkg := range Pkgs("github.com/retailnext/stan/internal/foo", "github.com/retailnext/stan/internal/bar") {
 		// show that lookupd type works for both a package that imports the type
 		// and the package that defines it
 		barType := pkg.LookupType("github.com/retailnext/stan/internal/bar.BarType")
@@ -46,24 +41,31 @@ func TestLookupBuiltinType(t *testing.T) {
 	}
 }
 
-// test special handling of _test packages
-func TestXTestPackage(t *testing.T) {
+// test special handling of _test and unbuildable packages
+func TestSpecialPackage(t *testing.T) {
 	foo := Pkgs("github.com/retailnext/stan/internal/foo...")
 
 	if p := foo[0].Path(); p != "github.com/retailnext/stan/internal/foo" {
 		t.Errorf("got %s", p)
 	}
 
-	if p := foo[1].Path(); p != "github.com/retailnext/stan/internal/foo:xtest" {
+	if p := foo[1].Path(); p != "github.com/retailnext/stan/internal/foo:nobuild(main)" {
 		t.Errorf("got %s", p)
 	}
-	if p := foo[1].Node.Name; p != "foo_test" {
+	if p := foo[1].Node.Name; p != "main" {
+		t.Errorf("got %s", p)
+	}
+
+	if p := foo[2].Path(); p != "github.com/retailnext/stan/internal/foo:xtest" {
+		t.Errorf("got %s", p)
+	}
+	if p := foo[2].Node.Name; p != "foo_test" {
 		t.Errorf("got %s", p)
 	}
 
 	// they both have FooFunc()
 	foo[0].LookupObject("github.com/retailnext/stan/internal/foo.FooFunc")
-	foo[1].LookupObject("github.com/retailnext/stan/internal/foo:xtest.FooFunc")
+	foo[2].LookupObject("github.com/retailnext/stan/internal/foo:xtest.FooFunc")
 
 	// if you ask for package directly, you get code package
 	singleFoo := Pkgs("github.com/retailnext/stan/internal/foo")

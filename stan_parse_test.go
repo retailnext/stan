@@ -26,7 +26,7 @@ func TestListPackages(t *testing.T) {
 	for _, pkg := range findAndParse([]string{"github.com/retailnext/stan/..."})[0] {
 		// we return separate packages with pseudo import paths for the
 		// _test packages
-		if strings.HasSuffix(pkg.path, ":xtest") {
+		if strings.HasSuffix(pkg.path, ":xtest") || strings.Contains(pkg.path, ":nobuild") {
 			continue
 		}
 		gotPaths = append(gotPaths, pkg.path)

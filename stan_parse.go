@@ -115,24 +115,32 @@ func findAndParseWildcard(paths []string) [][]*parsedPackage {
 				return nil
 			}
 
-			code, xtest, err := parseDir(path, fset)
+			parsed, err := parseDir(path, fset)
 			if err != nil {
 				panic(fmt.Sprintf("error parsing %s: %s", path, err))
 			}
 
-			if code != nil {
-				code.path = name
+			if parsed.code != nil {
+				parsed.code.path = name
 				for i, m := range match {
 					if m(name) {
-						ret[i] = append(ret[i], code)
+						ret[i] = append(ret[i], parsed.code)
 					}
 				}
 			}
-			if xtest != nil {
-				xtest.path = name + ":xtest"
+			if parsed.xtest != nil {
+				parsed.xtest.path = name + ":xtest"
 				for i, m := range match {
 					if m(name) {
-						ret[i] = append(ret[i], xtest)
+						ret[i] = append(ret[i], parsed.xtest)
+					}
+				}
+			}
+			for _, nobuild := range parsed.nobuild {
+				nobuild.path = name + ":nobuild(" + nobuild.pkg.Name + ")"
+				for i, m := range match {
+					if m(name) {
+						ret[i] = append(ret[i], nobuild)
 					}
 				}
 			}
@@ -176,18 +184,22 @@ func findAndParseWildcardLocal(pattern string) []*parsedPackage {
 			return nil
 		}
 
-		code, xtest, err := parseDir(path, fset)
+		parsed, err := parseDir(path, fset)
 		if err != nil {
 			panic(fmt.Sprintf("error parsing %s: %s", path, err))
 		}
 
-		if code != nil {
-			code.path = name
-			pkgs = append(pkgs, code)
+		if parsed.code != nil {
+			parsed.code.path = name
+			pkgs = append(pkgs, parsed.code)
 		}
-		if xtest != nil {
-			xtest.path = name + ":xtest"
-			pkgs = append(pkgs, xtest)
+		if parsed.xtest != nil {
+			parsed.xtest.path = name + ":xtest"
+			pkgs = append(pkgs, parsed.xtest)
+		}
+		for _, nobuild := range parsed.nobuild {
+			nobuild.path = name + ":nobuild(" + nobuild.pkg.Name + ")"
+			pkgs = append(pkgs, nobuild)
 		}
 
 		return nil
@@ -196,7 +208,10 @@ func findAndParseWildcardLocal(pattern string) []*parsedPackage {
 }
 
 func findAndParseSingle(importPath string) *parsedPackage {
-	path := filepath.FromSlash(strings.TrimSuffix(importPath, ":xtest"))
+	wantXtest := strings.HasSuffix(importPath, ":xtest")
+	importPath = strings.TrimSuffix(importPath, ":xtest")
+
+	path := filepath.FromSlash(importPath)
 
 	var dir string
 
@@ -217,31 +232,38 @@ func findAndParseSingle(importPath string) *parsedPackage {
 		panic(fmt.Sprintf("could not find package %s", importPath))
 	}
 
-	codePkg, testxPkg, err := parseDir(dir, fset)
+	parsed, err := parseDir(dir, fset)
 	if err != nil {
 		panic(fmt.Sprintf("error parsing %s: %s", dir, err))
 	}
 
-	if strings.HasSuffix(importPath, ":xtest") {
-		// they asked for _test package
-		if testxPkg == nil {
+	if wantXtest {
+		if parsed.xtest != nil {
+			parsed.xtest.path = importPath + ":xtest"
+			return parsed.xtest
+		} else {
 			panic(fmt.Sprintf("could not find package %s", importPath))
 		}
-		testxPkg.path = importPath
-		return testxPkg
 	} else {
-		if codePkg == nil {
+		if parsed.code != nil {
+			parsed.code.path = importPath
+			return parsed.code
+		} else {
 			panic(fmt.Sprintf("could not find package %s", importPath))
 		}
-		codePkg.path = importPath
-		return codePkg
 	}
 }
 
-func parseDir(dir string, fset *token.FileSet) (*parsedPackage, *parsedPackage, error) {
+type parsedDir struct {
+	code    *parsedPackage
+	xtest   *parsedPackage
+	nobuild []*parsedPackage
+}
+
+func parseDir(dir string, fset *token.FileSet) (*parsedDir, error) {
 	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var goFileNames []string
@@ -283,13 +305,13 @@ func parseDir(dir string, fset *token.FileSet) (*parsedPackage, *parsedPackage, 
 
 	for _, err := range errors {
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
 	astFiles, err = cgoIfRequired(nil, fset, astFiles)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	ctx := build.Default
@@ -325,7 +347,7 @@ func parseDir(dir string, fset *token.FileSet) (*parsedPackage, *parsedPackage, 
 		} else {
 			match, err = ctx.MatchFile(dir, baseName)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 		}
 
@@ -338,22 +360,24 @@ func parseDir(dir string, fset *token.FileSet) (*parsedPackage, *parsedPackage, 
 		pkg.pkg.Files[fileName] = f
 	}
 
-	var codePkg, xtestPkg *parsedPackage
+	var ret parsedDir
 	for _, pkg := range pkgs {
-		if strings.HasSuffix(pkg.pkg.Name, "_test") {
-			if xtestPkg != nil {
-				return nil, nil, fmt.Errorf("more than one _test package in %s", dir)
+		if len(pkg.buildFiles) == 0 {
+			ret.nobuild = append(ret.nobuild, pkg)
+		} else if strings.HasSuffix(pkg.pkg.Name, "_test") {
+			if ret.xtest != nil {
+				return nil, fmt.Errorf("more than one _test package in %s", dir)
 			}
-			xtestPkg = pkg
+			ret.xtest = pkg
 		} else {
-			if codePkg != nil {
-				return nil, nil, fmt.Errorf("more than one package declared in %s (%s and %s)", dir, codePkg.pkg.Name, pkg.pkg.Name)
+			if ret.code != nil {
+				return nil, fmt.Errorf("more than one package declared in %s (%s and %s)", dir, ret.code.pkg.Name, pkg.pkg.Name)
 			}
-			codePkg = pkg
+			ret.code = pkg
 		}
 	}
 
-	return codePkg, xtestPkg, nil
+	return &ret, nil
 }
 
 func cgoIfRequired(bp *build.Package, fset *token.FileSet, astFiles []*ast.File) ([]*ast.File, error) {

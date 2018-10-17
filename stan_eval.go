@@ -28,14 +28,14 @@ func EvalPkg(code string) *Package {
 		panic(fmt.Sprintf("error writing fake_package.go: %s", err))
 	}
 
-	codePkg, xtestPkg, err := parseDir(tmpDir, token.NewFileSet())
+	parsed, err := parseDir(tmpDir, token.NewFileSet())
 	if err != nil {
 		panic(fmt.Sprintf("error parsing fake package: %s", err))
 	}
 
-	pkg := codePkg
+	pkg := parsed.code
 	if pkg == nil {
-		pkg = xtestPkg
+		pkg = parsed.xtest
 	}
 
 	var packageName string
