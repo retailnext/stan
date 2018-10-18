@@ -97,8 +97,11 @@ type importNode struct {
 // things to parse/check as much code as possible:
 // 	 - includes *_test.go files in packages
 // 	 - includes "XTest" _test packages as separate packages
-// 	 - attempts to invoke cgo preprocessor on cgo files so type info is available
-// 	 - loads all *.go files, even if non-buildable due to build constraints (stan will rename duplicate objects to prevent type checking errors, and ignore "hard" type check error for non-buildable files)
+// 	 - attempts to invoke cgo preprocessor on cgo files so type info is
+//     available
+// 	 - loads all *.go files, even if non-buildable due to build constraints
+//     (stan will rename duplicate objects to prevent type checking errors,
+//     and ignore "hard" type check error for non-buildable files)
 //
 func Pkgs(pkgPaths ...string) []*Package {
 	// keep it simple
@@ -217,64 +220,6 @@ type ObjectLifetime struct {
 // returns the zero value ObjectLifetime.
 func (p *Package) LifetimeOf(obj types.Object) ObjectLifetime {
 	return p.lifetimes[obj]
-}
-
-// Ancestors is a slice of ast.Nodes representing a node's ancestor
-// nodes in the AST. A node's direct parent is the final node in the
-// Ancestors.
-type Ancestors []ast.Node
-
-// Peek() returns the closest ancestor in a, or nil if a is empty.
-func (a Ancestors) Peek() ast.Node {
-	if len(a) == 0 {
-		return nil
-	}
-	return a[len(a)-1]
-}
-
-// Pop() removes and returns the closest ancestor in a. Pop() returns nil if a
-// is empty.
-func (a *Ancestors) Pop() ast.Node {
-	if len(*a) == 0 {
-		return nil
-	}
-	ret := (*a)[len(*a)-1]
-	*a = (*a)[:len(*a)-1]
-	return ret
-}
-
-type astWalker struct {
-	ancestors Ancestors
-	fn        func(node ast.Node, ancs Ancestors)
-}
-
-func (w *astWalker) Visit(node ast.Node) ast.Visitor {
-	// finished walking children, remove self from ancestors
-	if node == nil {
-		w.ancestors = w.ancestors[:len(w.ancestors)-1]
-		return nil
-	}
-
-	w.fn(node, w.ancestors)
-
-	// add self to ancestors list for walking children
-	w.ancestors = append(w.ancestors, node)
-
-	return w
-}
-
-// Walk the AST starting rooted at n yielding the slice of ancestors for
-// each node visited. The ancestors slice is mutated during traversal so
-// be sure to copy() the ancestors if you want to save them off.
-func WalkAST(n ast.Node, fn func(node ast.Node, ancs Ancestors)) {
-	if n == nil {
-		panic(fmt.Sprintf("nil ast.Node passed to WalkAST"))
-	}
-
-	walker := &astWalker{
-		fn: fn,
-	}
-	ast.Walk(walker, n)
 }
 
 // Look up ancestor nodes of given node. AncestorsOf panics if the target node
