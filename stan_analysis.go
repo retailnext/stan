@@ -50,10 +50,19 @@ func (p *Package) Files() map[string]*ast.File {
 	return p.Node.Files
 }
 
-// ObjectOf() returns the corresponding types.Object of an AST identifier. Can
-// return nil if the identifier has no corresponding types.Object.
-func (p *Package) ObjectOf(id *ast.Ident) types.Object {
-	return p.TypesInfo.ObjectOf(id)
+// ObjectOf() returns the corresponding types.Object of an ast.Node. n normally
+// should be an *ast.Ident, but ObjectOf will also extract the ident from an
+// *ast.SelectorExpr. The return value can be nil if there is no corresponding
+// object.
+func (p *Package) ObjectOf(n ast.Node) types.Object {
+	switch v := n.(type) {
+	case *ast.Ident:
+		return p.TypesInfo.ObjectOf(v)
+	case *ast.SelectorExpr:
+		return p.TypesInfo.ObjectOf(v.Sel)
+	default:
+		return nil
+	}
 }
 
 // TypeOf() returns the types.Type of a given expression. Can return

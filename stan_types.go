@@ -178,7 +178,7 @@ func (p *Package) DeclOf(o types.Object) (otherPkg *Package, node ast.Node, ancs
 		otherPkg = Pkgs(o.Pkg().Path())[0]
 	}
 
-	sourceTokenFile := p.Fset.File(o.Pos())
+	sourceTokenFile := otherPkg.Fset.File(o.Pos())
 
 	// Look up ast file by name rather than pos since files can be in the
 	// file set more than once (can get loaded by the importer, then loaded

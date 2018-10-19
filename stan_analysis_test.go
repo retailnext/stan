@@ -122,18 +122,24 @@ func TestInvocationsOf(t *testing.T) {
 func TestDeclOf(t *testing.T) {
 	foo := Pkgs("github.com/retailnext/stan/internal/foo")[0]
 
-	bf := foo.LookupObject("github.com/retailnext/stan/internal/bar.BarFunc")
-	pkg, id, ancs := foo.DeclOf(bf)
+	fakePkg := EvalPkg(`
+package fake
+`)
 
-	if pkg != Pkgs("github.com/retailnext/stan/internal/bar")[0] {
-		t.Errorf("expected bar, was %s", pkg)
-	}
+	for _, sourcePkg := range []*Package{foo, fakePkg} {
+		bf := sourcePkg.LookupObject("github.com/retailnext/stan/internal/bar.BarFunc")
+		pkg, id, ancs := sourcePkg.DeclOf(bf)
 
-	if id := id.(*ast.Ident); id.Name != "BarFunc" {
-		t.Errorf("got %s", id.Name)
-	}
+		if pkg != Pkgs("github.com/retailnext/stan/internal/bar")[0] {
+			t.Errorf("expected bar, was %s", pkg)
+		}
 
-	if _, ok := ancs.Peek().(*ast.FuncDecl); !ok {
-		t.Errorf("expected FuncDecl, was %T", ancs.Peek())
+		if id := id.(*ast.Ident); id.Name != "BarFunc" {
+			t.Errorf("got %s", id.Name)
+		}
+
+		if _, ok := ancs.Peek().(*ast.FuncDecl); !ok {
+			t.Errorf("expected FuncDecl, was %T", ancs.Peek())
+		}
 	}
 }
